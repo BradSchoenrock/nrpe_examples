@@ -1,0 +1,60 @@
+#!/bin/bash
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+STATE_DEPENDENT=4
+REVISION="1"
+PROGNAME=`basename $0`
+
+print_usage() {
+  echo "Usage:"
+  echo "  $PROGNAME host:port"
+}
+
+print_help() {
+  echo "Checks fs for RO status"
+  print_usage
+  echo "--help|-h"
+  echo "Print this help screen"
+}
+
+# Information options
+case $1 in
+--help)
+                print_help
+    exit $STATE_OK
+    ;;
+-h)
+                print_help
+    exit $STATE_OK
+    ;;
+--version)
+                print_revision $PROGNAME $REVISION
+    exit $STATE_OK
+    ;;
+-V)
+                print_revision $PROGNAME $REVISION
+    exit $STATE_OK
+    ;;
+*)
+    if [ "$1" != "" ];then
+    print_usage
+    exit $STATE_UNKNOWN
+    fi
+esac
+
+ro_fs=$(grep '^/dev' /proc/mounts |grep 'ro,' | awk '{print $2}'| tr '\n' ' ')
+fs_list=$(grep '^/dev/' /proc/mounts | awk '{print $2}'|tr '\n' ' ')
+
+if [ -z "$ro_fs" ]; then
+        echo "OK: all FS are in RW mode ($fs_list)"
+        exit $STATE_OK
+else
+        echo "ERROR: some FS are in RO mode ($ro_fs)"
+        exit $STATE_CRITICAL
+fi
+
+exit 0
+

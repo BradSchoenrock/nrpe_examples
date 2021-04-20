@@ -1,0 +1,65 @@
+#!/bin/bash
+################################################################
+# Script to check a service, if service is not running it will try to start the service
+# This script will be used as an NRPE plugin for ICINGA monitoring
+#
+# Revision History:
+#       Version: 1.0
+#       Date:    2019-04-25
+################################################################
+
+rmq_status_cmd="sudo /sbin/service rabbitmq-server status"
+rmq_stop_cmd="sudo /sbin/service rabbitmq-server stop"
+rmq_start_cmd="sudo /sbin/service rabbitmq-server start"
+
+sleep_secs=5
+running_app=0
+node_not_running=0
+node_down=0
+
+fn_check_service()
+{
+	rmq_status_result="$($rmq_status_cmd)"
+
+	running_app="$(echo $rmq_status_result | grep -c "running_applications")"
+	node_not_running="$(echo $rmq_status_result | grep -c "node 'rabbit' not running at all")"
+	node_down="$(echo $rmq_status_result | grep -c "nodedown")"
+
+
+	if [ "$running_app" = "1" ]
+	then
+		state=0
+	fi
+
+	if [ "$node_down" = "1" -o "$node_not_running" = "1" ]
+	then
+		state=2
+	fi
+
+}
+
+fn_check_service
+
+if [ "$state" = 0 ]
+then
+	echo "SERVICE OK: Service rabbitmq-server is running."
+	exit 0
+fi
+
+if [ "$state" = 2 ] 
+then
+	# Service is down, starting the service
+	rmq_stop_start_result="$($rmq_stop_cmd) && $($rmq_start_cmd)"
+        sleep $sleep_secs 
+        fn_check_service
+	if [ "$state" = 0 ]
+	then
+        	echo "SERVICE OK: Service rabbitmq-server is running."
+        	exit 0
+	fi
+        if [ "$state" = 2 ]
+        then
+		echo "SERVICE CRITICAL: Service rabbitmq-server is not running."
+		exit 2
+        fi
+fi	

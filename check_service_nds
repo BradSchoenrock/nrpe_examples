@@ -1,0 +1,22 @@
+#!/bin/bash
+if [[ -z $1 ]] ; then
+	echo "SCRIPT CRITICAL: required string for service match not supplied"
+	exit 2
+fi
+
+req=$(sudo /usr/local/bin/nds_service)
+res=$(echo $req | grep $1)
+running=$(echo $res | grep running) 
+
+if [[ -z $res ]] ; then 
+	echo "CRITICAL: Service \"$1\" not found in nds_service"
+	exit 2
+fi
+
+if [[ -z $running ]] ; then 
+        echo "CRITICAL: Service \"$1\" not running"
+        exit 2
+fi
+
+echo "OK: Service \"$1\" is running"
+exit 0

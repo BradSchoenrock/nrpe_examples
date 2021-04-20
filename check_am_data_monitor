@@ -1,0 +1,9 @@
+#!/bin/bash
+#Usage ./script
+check_sum=($(sha256sum /usr/lib64/nagios/plugins/nrpe/amm | awk '{ print $1 }'))
+if [[ $check_sum == "b5dbab57100a90104dc8185112ff86b0f826de882d10192cedfc8e99779cc005" ]]; then
+ message=`/usr/lib64/nagios/plugins/nrpe/amm`
+ ret_code=$?
+ echo $message 
+ exit $ret_code
+fi

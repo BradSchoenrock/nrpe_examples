@@ -1,0 +1,26 @@
+#!/bin/bash
+
+if [[ $# < 1 ]] ; then 
+	echo "SCRIPT CRITICAL: Missing Arguments."
+	#echo "Execute like: /script.sh <snmp over http port number>"
+	exit 2
+fi
+
+port=$1
+state_line=$(curl -s http://127.0.0.1:$port/snmpget | grep 'name="state"')
+if [[ $? != 0 ]]
+then
+	echo "SCRIPT CRITICAL: Unable to fetch SNMP information on port $1"
+	exit 2
+fi
+
+if echo $state_line | grep 'value="1"' > /dev/null 2>&1
+then
+	echo "OK: SNMP reports healthy with a state of \"1\""
+	exit 0
+fi
+
+state_value=$(echo $state_line | sed 's/.*value="\(.*\)".*/\1/')
+echo "CRITICAL: SNMP reports degraded with a state of \"${state_value}\""
+exit 2
+

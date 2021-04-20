@@ -1,0 +1,71 @@
+#!/bin/bash
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+STATE_DEPENDENT=4
+
+REVISION="1"
+
+PROGNAME=`basename $0`
+
+print_usage() {
+  echo "Usage:"
+  echo "  $PROGNAME"
+}
+
+print_help() {
+  echo "Checks network connectivity (ICMP) with VOD backoffices"
+  print_usage
+  echo "--help|-h"
+  echo "   Print this help screen"
+}
+
+# Information options
+case $1 in
+--help)
+                print_help
+    exit $STATE_OK
+    ;;
+-h)
+                print_help
+    exit $STATE_OK
+    ;;
+--version)
+                print_revision $PROGNAME $REVISION
+    exit $STATE_OK
+    ;;
+-V)
+                print_revision $PROGNAME $REVISION
+    exit $STATE_OK
+    ;;
+*)
+    if [ "$1" != "" ];then
+            print_usage
+            exit $STATE_UNKNOWN
+    fi
+esac
+
+list=$(grep "<server model" /etc/opt/csm.xml | awk -F"serverId=" {'print $2'} | cut -d'"' -f2)
+
+if [ -z "$list" ];then
+	echo "WARNING: No VOD server IPs found in /etc/opt/csm.xml"
+	exit 1
+fi
+ulist=""
+for ip in $list ; do
+        ping $ip -c1 -w1 1>/dev/null 2>/dev/null
+        if [ "$?" != "0" ] ;then
+                ulist="$ulist $ip(`grep $ip /etc/opt/csm.xml|cut -f6 -d '"'`)"
+        fi
+done
+if [ "$ulist" == "" ]; then
+        echo "OK: VOD IPs are reachable - $list"
+        exit $STATE_OK
+else
+        echo "CRITICAL: VOD IPs are not reachable: $ulist"
+        exit $STATE_CRITICAL
+fi
+
+exit 0

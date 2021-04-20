@@ -1,0 +1,22 @@
+#!/bin/bash
+
+expected_count=$1
+
+#run db check script and extract status and database count
+script_output=$(myqs_chrClusterCheck.sh chrCluster123! | head -n 5 | tail -n 1 | awk '{print $4, $5}')
+read db_count status <<< $script_output
+
+if [[ $status != 'Sync' ]]
+then
+        echo "DB STATUS CRITICAL: cluster check reports status of '$status', with db count '$db_count', when expected status was 'Sync'"
+        exit 2
+fi
+
+if [[ $db_count != $expected_count ]]
+then
+        echo "DB COUNT CRITICAL: cluster check reports count of '$db_count', with status '$status', when expected count was '$expected_count'"
+        exit 2
+fi
+
+echo "OK: cluster check reports expected db count of '$db_count' with status of '$status'"
+exit 0

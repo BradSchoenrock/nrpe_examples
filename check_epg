@@ -1,0 +1,125 @@
+#!/bin/bash
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+
+carousel=$1
+file_name=$2
+ipg_size_threshold=$3
+location=$(uname -n | cut -d"." -f3)
+epg_start_time=0
+epg_end_time=12
+flag=0
+
+hostname=$(hostname)
+
+listVar="aabfl   albny   alcotn  allnmi  ashenc  augme   austx   bakca   baysmi  bhmal   birmal  bknny   bngny   bufny   canoh   clboh   cleoh   cscsc   cowymt   daltx   delfl   denttx  detmi   ftwrtx  grdca   gsaasc  gsonc   gwinga  hvnny   hwdca   indin   ineca   jacktn  kearne  kennwa  kscmo   leedal  lncne   medfor  mkewi   mpkhca  mpksca  mtnamt   newnga  newtct  nmnny   ocfca   porme   qunny   ralnc   rchny   reddca  renonv  rochmn  rtxtx   saxtx   sdgca   sfvca   sldcmo  sldlla  slotca  smnny   spngtx  stckga  stclmn  stiny   stiny   syrny   tbdxla  tbdxla  tpbfl   tpffl   trictn  wilnc   worcma"
+
+for i in $listVar; do
+        if [[ "$hostname" = *"$i"* ]]
+        then
+                flag=1
+                break
+        fi
+done
+
+if [ $flag -eq 1 ]
+then
+        votoolsip="98.8.170.155"
+else
+        votoolsip="98.9.230.155"
+fi
+
+case "$location" in
+        fl|ma|mi|mn|ny|oh|sc)
+        current_date=$(date -d '4 hours ago' +%Y%m%d)
+        current_time=$(date -d '4 hours ago' +"%H")
+        day=$(date -d '4 hours ago' +%u)
+        ;;
+        co)
+        current_date=$(date -d '6 hours ago' +%Y%m%d)
+        current_time=$(date -d '6 hours ago' +"%H")
+        day=$(date -d '6 hours ago' +%u)
+        ;;
+        al|la|mo|tn|tx|wi)
+        current_date=$(date -d '5 hours ago' +%Y%m%d)
+        current_time=$(date -d '5 hours ago' +"%H")
+        day=$(date -d '5 hours ago' +%u)
+        ;;
+        ca|nv|or)
+        current_date=$(date -d '7 hours ago' +%Y%m%d)
+        current_time=$(date -d '7 hours ago' +"%H")
+        day=$(date -d '7 hours ago' +%u)
+        ;;
+        hi)
+        current_date=$(date -d '10 hours ago' +%Y%m%d)
+        current_time=$(date -d '10 hours ago' +"%H")
+        day=$(date -d '10 hours ago' +%u)
+        ;;
+        *)
+        current_date=$(date +%Y%m%d)
+        current_time=$(date +"%H")
+        day=$(date +%u)
+        ;;
+esac
+if [[ ! "$current_time" -lt "$epg_start_time" && ! "$current_time" -gt "$epg_end_time" ]]; then
+        echo "EPG data is not published during 00:00 to 12:00"
+        exit $STATE_OK
+else
+        if [[  "$day" -ne 7 ]]; then
+        if [ "$#" -ne 3 ]; then
+                  echo "Invalid number of Arguments"
+                  exit $STATE_WARNING
+        elif ! grep -q currentTaskName /opt/sandt/conf/tsbroadcaster/platform/common-platform*; then
+                  echo "OK - Server on Standby"
+          exit $STATE_OK
+        else
+        response=$(curl -iLk --connect-timeout 58 --max-time 59 "http://$votoolsip:80/api/v1/tsb?clli=$(uname -n | awk -F- '{print $1}' | cut -c 6- )&host_ip=$(/sbin/ip addr show eth0 | grep 'inet ' | cut -d'/' -f1  | awk '{ print $NF}')&carousel=$carousel&file=$file_name" 2>/dev/null | grep HTTP | awk -F" " '{print $2}' | grep 200)
+        if [ "$response" != "200" ]; then
+                echo "WARNING: No response from TSB API"
+                exit $STATE_WARNING
+        else
+                file_size=$(curl -sLk --connect-timeout 58 --max-time 59 "http://$votoolsip:80/api/v1/tsb?clli=$(uname -n | awk -F- '{print $1}' | cut -c 6- )&host_ip=$(/sbin/ip addr show eth0 | grep 'inet ' | cut -d'/' -f1  | awk '{ print $NF}')&carousel=$carousel&file=$file_name" )
+		if [ "$file_size" = "404 page not found" ]; then
+		  echo "Unable to get the status of EPG data"
+		  exit $STATE_WARNING
+		fi
+                days=($( echo "$file_size" | grep ID | cut -d'"' -f4 | sed 's/..$//' ))
+                data=($( echo "$file_size" | grep FILE_SIZE | cut -d'"' -f4 ))
+                for i in {0..13}; do
+                 next_days+=($(date +%Y%m%d -d " $current_date + $i day"))
+                done
+                for i in "${next_days[@]}"; do
+                skip=
+                        for j in "${days[@]}"; do
+                                [[ $i == $j ]] && { skip=1; break; }
+                        done
+                [[ -n $skip ]] || crit_ipg_days+=("$i")
+                done
+                count="${#days[@]}"
+                for ((i=0; i<count; i++)); do
+                   ipg_size="${data[${i}]}"
+                   if [ "$ipg_size" -lt "$ipg_size_threshold" ]; then
+                     ipg_crit_files+=("${data[$i]}")
+                     ipg_crit_filedays+=("${days[$i]}")
+                   fi
+                done
+                if [ ${#crit_ipg_days[@]} -ne 0 ] || [ ${#ipg_crit_files[@]} -ne 0 ]; then
+			if [ ${#crit_ipg_days[@]} -ne 0 ]; then
+                                echo "Missing data for the following days ${crit_ipg_days[*]}"
+                                exit $STATE_CRITICAL
+                        fi
+                        if [ ${#ipg_crit_files[@]} -ne 0 ]; then
+                                echo "Insufficient data for files ${ipg_crit_filedays[*]}"
+                                exit $STATE_CRITICAL
+                        fi
+                fi
+                echo "All files are present and contain sufficient data"
+                exit $STATE_OK
+        fi
+fi
+else
+        echo "EPG data is not published on sunday morning"
+        exit $STATE_OK
+fi
+fi

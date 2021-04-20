@@ -1,0 +1,11 @@
+#!/bin/bash
+#set -x
+res=`curl -s http://172.28.49.6:8380/adrouter/admin.jsp | grep "Ad Router Administration" | wc -l`
+if [[ $res < 1 ]] ;
+ then
+        echo "Ad Router Administration Web page is not working properly"
+ exit 2
+else
+        echo "Ad Router Administration Web page is OK"
+ exit 0
+fi

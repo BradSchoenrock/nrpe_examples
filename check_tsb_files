@@ -1,0 +1,36 @@
+#!/bin/bash
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+
+if ! grep -q currentTaskName /opt/sandt/conf/tsbroadcaster/platform/common-platform*; then
+        echo "OK - Server on Standby"
+        exit $STATE_OK
+fi
+
+z_dts_wb_ini=$(curl -sL --connect-timeout 58 --max-time 59 "http://98.9.230.155:80/api/v1/tsb?clli=$(uname -n | awk -F"-" '{print $1}' | cut -c 6- )&host_ip=$(/sbin/ip addr show eth0 | grep 'inet ' | cut -d'/' -f1  | awk '{ print $NF }')&carousel=WB_OOB_cfg_app&file=z_dts_wb.ini" | grep -c zdb)
+profile_wb_zdb=$(curl -sL --connect-timeout 58 --max-time 59 "http://98.9.230.155:80/api/v1/tsb?clli=$(uname -n | awk -F"-" '{print $1}' | cut -c 6- )&host_ip=$(/sbin/ip addr show eth0 | grep 'inet ' | cut -d'/' -f1  | awk '{ print $NF }')&carousel=WB_OOB_cfg_app&file=profile_wb.zdb" | grep -c '<root>')
+boot_wb_cfg=$(curl -sL --connect-timeout 58 --max-time 59 "http://98.9.230.155:80/api/v1/tsb?clli=$(uname -n | awk -F"-" '{print $1}' | cut -c 6- )&host_ip=$(/sbin/ip addr show eth0 | grep 'inet ' | cut -d'/' -f1  | awk '{ print $NF }')&carousel=WB_OOB_cfg_app&file=boot_wb.cfg" | grep -c 'etv' )
+am_cfg=$(curl -sL --connect-timeout 58 --max-time 59 "http://98.9.230.155:80/api/v1/tsb?clli=$(uname -n | awk -F"-" '{print $1}' | cut -c 6- )&host_ip=$(/sbin/ip addr show eth0 | grep 'inet ' | cut -d'/' -f1  | awk '{ print $NF }')&carousel=WB_OOB_cfg_app&file=am.cfg" | grep -c docsis)
+
+if [ $z_dts_wb_ini -lt 1 ]; then
+        critical_list+="z_dts_wb.ini "
+fi
+if [ $profile_wb_zdb -lt 1 ]; then
+        critical_list+="profile_wb.zdb "
+fi
+if [ $boot_wb_cfg -lt 1 ]; then
+        critical_list+="boot_wb.cfg "
+fi
+if [ $am_cfg -lt 1 ]; then
+        critical_list+="am.cfg "
+fi
+if [ ! -z "$critical_list" ]; then
+        echo "CRITICAL: $critical_list is not present in TSB"
+        exit $STATE_CRITICAL
+else
+        echo "OK: All files present in TSB"
+        exit $STATE_OK
+fi

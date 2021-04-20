@@ -1,0 +1,27 @@
+#!/bin/bash
+
+function usage()
+{
+  echo "SCRIPT CRITICAL: Missing arguments."
+  exit 3
+}
+
+if [[ $# < 1 ]]; then
+  usage
+fi
+
+oid_ref=$1
+oid_status=$(snmpwalk -v2c -c public 127.0.0.1 $oid_ref|awk -F: '{print $4}'|xargs)
+
+if [[ $? != 0 ]]; then
+  echo "SCRIPT CRITICAL: Unable to fetch the status of the component."
+  exit 2
+fi
+
+if [[ $oid_status -ge 200 ]]; then
+  echo "CRITICAL: SNMP reports that component is degraded"
+  exit 2
+fi
+
+echo "OK: SNMP reports healthy with a state of $oid_status"
+exit 0

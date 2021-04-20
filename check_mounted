@@ -1,0 +1,14 @@
+#!/bin/bash
+if [[ $# == 0 ]]; then
+        echo "disk required as arg1"
+        exit 1
+fi
+
+count=$(df -h --portability | grep $1 | wc -l)
+if [[ $count > 0 ]]; then
+        echo "MOUNT OK: \"$1\" is mounted. "
+        exit 0
+else
+        echo "MOUNT CRITICAL: \"$1\" is not mounted"
+        exit 2
+fi

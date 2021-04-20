@@ -1,0 +1,33 @@
+#!/bin/bash
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+
+eth=$(uname -n | awk -F- '{print $3}' | awk -F. '{print $1}')
+
+if [ $eth == "a" ]; then
+  status=$(curl -sLk --connect-timeout 58 --max-time 59 http://98.9.230.155:80/api/v1/tsb/clli/$(uname -n | awk -F- '{print $1}' | cut -c 6- ) | awk -F'"' '$2=="status"{print $4}' | sed -n '1p')
+elif [ $eth == "b" ]; then
+  status=$(curl -sLk --connect-timeout 58 --max-time 59 http://98.9.230.155:80/api/v1/tsb/clli/$(uname -n | awk -F- '{print $1}' | cut -c 6- ) | awk -F'"' '$2=="status"{print $4}' | sed -n '2p')
+fi
+
+if [ -z "$status" ]; then
+        echo "WARNING: status unknown"
+        exit $STATE_WARNING
+fi
+
+if [ "$status" == "System OK" ];then
+        echo "OK: $status"
+        exit $STATE_OK
+elif [ "$status" == "System ATTENTION" ];then
+        echo "OK: $status"
+        exit $STATE_OK
+elif [ "$status" == "null" ];then
+        echo "Unable to fetch the information of the TSB"
+        exit $STATE_WARNING
+else
+        echo "Critical: $status"
+        exit $STATE_CRITICAL
+fi

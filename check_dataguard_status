@@ -1,0 +1,50 @@
+#!/bin/bash
+# script to check dataguard presence
+# Tim Bailey 061515
+#set -x
+# Clear out old logs
+
+find /var/log/nds/ora_dg/dg_status_rac*.log -type f -mtime +7 -exec rm {} \;
+
+# Check for status script already running
+
+PREVIOUS=`ps -ef|grep -v grep|grep "dg_status_rac_to_rac.sh" | wc -l`
+
+if [ $PREVIOUS -ge 1 ]
+then
+exit 0
+else
+
+# Run new check
+
+sudo -u oracle /opt/nds/ora_dg/utils/rac_to_rac/dg_status_rac_to_rac.sh $1
+
+
+logfile=/var/log/nds/ora_dg/`ls -lt /var/log/nds/ora_dg | grep -i $1 | head -1 | awk '{print $9}'`
+
+
+        if [ -a $logfile ]
+        then
+        OTHERSRVR=`grep "is not Primary DB" $logfile | awk '{print $3,$4,$5,$6}'`
+        PRIM=`grep "Primary database" $logfile  | awk '{print $3,$4}'`
+        SECOND=`grep "Physical standby database" $logfile  | awk '{print $3,$4,$5}'`
+                if [ "$4" = "$OTHERSRVR" ]
+                then
+                echo "OK -$1 is on failover server...check not needed"
+                exit 0
+                else
+
+                        if [ "$2" = "$PRIM" ] && [ "$3" = "$SECOND" ]
+                        then
+                        echo "OK - data guard for $1 is set"
+                        exit 0
+                        else
+                        echo "Problem with Data Guard for $1"
+                        exit 2
+                        fi
+                fi
+        echo "UNKNOWN - $logfile not found"
+        exit 3
+
+        fi
+fi

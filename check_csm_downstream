@@ -1,0 +1,14 @@
+#!/bin/bash
+
+#checks downstream CSM plugin for degraded Stitchers
+
+
+count=`curl -s http://$(hostname -i):9099/DownstreamPlugin?cmd=status |grep Degraded |wc -l`
+
+if [ $count -ne 0 ]; then
+        echo "SERVICE CRITICAL: DownstreamPlugin interface reports $count degraded stitchers"
+        exit 2
+fi
+
+echo "SERVICE OK: $count degraded stitchers"
+exit 0

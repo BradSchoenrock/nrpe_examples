@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Verify if services are passed as argument to the script
+# if not, exit with error
+if [[ -z $1 ]]; then
+  echo "SCRIPT CRITICAL: arg1 required."
+  exit 2
+fi
+
+function centos()
+{
+  if [[ ! -z $version ]]; then
+        res=$(sudo /usr/bin/systemctl status $service|grep Active:)
+  else
+        res=$(sudo /sbin/service $service status)
+  fi
+}
+
+# verify if we are running version 7.x of CentOS
+version=$(egrep '7\.' /etc/redhat-release)
+
+errors=0
+failed_services=''
+
+# Verify if more than 1 argument is passed to the script
+# if yes, split the 2nd set of arguments as comma separated
+# and validate each service
+if [[ ! -z $2 ]]; then
+  IFS=,
+  for arg_list in $2; do
+        service=$arg_list
+        centos
+        if [[ $(echo "$res" | grep -Ei "running|exited" |grep -i -v not|wc -l) -lt 1 ]]; then
+          errors=$((errors+1))
+          failed_services+="\"$service\" "
+        fi
+  done
+  if [[ $errors != 0 ]]; then
+        echo "SERVICE CRITICAL: Encountered $errors errors with the following failed services: $failed_services"
+        exit 2
+  else
+        echo "SERVICE OK: \"$2\" are running"
+  fi
+fi
+
+# Complete by validating the original argument
+service=$1
+centos
+
+if [[ $(echo "$res"|grep -Ei "running|exited" | grep -i -v not|wc -l) -lt 1 ]]; then
+  echo "SERVICE CRITICAL: Service $1 is not running. Received output \"$res\" when checking service status."
+  exit 2
+else
+  echo "SERVICE OK: Service $1 is running."
+  exit 0
+fi

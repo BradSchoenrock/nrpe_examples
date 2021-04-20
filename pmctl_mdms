@@ -1,0 +1,144 @@
+#!/usr/bin/python27 -u
+
+#
+# Author: Donjuma Lee
+# Modified by Jcarter with --service and --list, set default mode to check not stop.
+# Created on: 2014-06-13
+# ----------------------------
+#
+# Revision History:
+# version: 1.0
+# date:    2014-06-13
+#
+
+from mdms.json import xpj
+from mdms import utils as mut
+from pprint import pprint
+import sys
+import argparse
+
+# jsonpath location of all service names in configuration file
+global_service_name_path = '$[*].name'
+# jsonpath location of serviec binary executable directory 
+dir_path = 'settings.[*]."pmon.directory"'
+# jsonpath location of serviec stop command
+stop_path = 'settings.[*]."pmon.stop"'
+# jsonpath location of serviec start command
+start_path = 'settings.[*]."pmon.start"'
+# jsonpath location of serviec check command
+check_path = 'settings.[*]."pmon.check"'
+# default location of JSON configuration file
+default_conf = '/opt/monaco/process_manager/etc/last_known_configuration.json'
+# service list we should never start/stop
+excluded_services = ['named', 'ntpd', 'process_manager']
+
+def getValue(path, service):
+  val = xpj.getValueFromPath(path=path, jdat=service)
+  if not val:
+    return None
+  return val[0]['value']
+
+def pmonExec(jdata, xpath, title):
+  '''Execute a specific action on a service based on the xpath
+  '''
+
+  for service in jdata:
+    if service['name'] in excluded_services:
+      print 'ERR: Service check skipped due to service exclusion'
+      return 2
+    else:
+      # get the value of pmon.directory
+      pmon_dir = getValue(dir_path, service)
+
+      # get the value of whatever action we will be taking
+      pmon_action = getValue(xpath, service)
+
+      # make sure that the settings existed
+      if not pmon_dir or not pmon_action:
+        print 'ERR: Skipping "{n}" since it has invalid configuration'.format(n=service['name'])
+        return 2
+      else:
+        # construct the command to be executed
+        cmd = '{dir}/{stop}'.format(dir=pmon_dir, stop=pmon_action)
+
+        # execute the action
+        stat = mut.pExec(cmd)
+
+        # success or failure
+        if stat['p'].returncode == 0:
+          print 'OK: SUCCESS {t} service "{s}"'.format(t=title, s=service['name'])
+          #ugly hack by jcarter, only will process a single service at a time.
+	  return 0
+        else:
+          print 'ERR: FAILED {t} service "{s}"'.format(t=title, s=service['name'])
+          return 2
+
+def main():
+  '''
+  '''
+  # script operating mode
+  default_mode ='check'
+  
+  # configure CLI processing
+  parser = argparse.ArgumentParser(description='Execute commands in VMware instances')
+  parser.add_argument('--list',
+                      action='store_true',
+                      dest='list',
+                      default=False,
+                      help='list services and taking no action')
+  parser.add_argument('--conf',
+                      action='store',
+                      dest='conf',
+                      metavar='FILE',
+                      default=default_conf,
+                      help='Process Manager last known configuration file')
+  parser.add_argument('--mode',
+                      action='store',
+                      dest='mode',
+                      metavar='MODE',
+                      default=default_mode,
+                      choices = ['stop','start', 'check'],
+                      help='stop, start, or check')
+  parser.add_argument('--service',
+                      action='store',
+                      dest='service',
+                      metavar='SERVICE',
+                      default=False,
+                      nargs='+',
+                      help='service to check')
+  args = parser.parse_args() 
+  
+  # load JSON data
+  jdat = xpj.getJsonData(args.conf)
+
+  service_registry = {}
+  for item in jdat:
+    service_registry[item["name"]] = item
+
+  if args.list:
+    for item in service_registry: 
+      print item
+    exit(0)
+
+  # if service argument defined, set jdat to item json
+  if args.service:
+    service_name = " ".join(args.service)
+    if service_name not in service_registry:
+      print "invalid service name {service} provided.".format(service=service_name)
+      exit(2)
+    jdat = [service_registry[service_name]]
+
+  if args.mode == 'stop':
+    exit(pmonExec(jdata=jdat, xpath=stop_path, title="stopping"))
+  elif args.mode == 'start':
+    exit(pmonExec(jdata=jdat, xpath=start_path, title="starting"))
+  elif args.mode == 'check':
+    exit(pmonExec(jdata=jdat, xpath=check_path, title="checking"))
+  else:
+    print("ERR: Script misconfigured, invalid mode")
+    exit(2)
+  
+if __name__ == '__main__':
+  main()
+
+

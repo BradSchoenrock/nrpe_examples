@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# File: ple_test.sh
+#
+# Description: This is a test script that will test the status of the playlist
+#              server by curling each channel that should be enabled for DAI.
+#              The script will return error if curl fails to takes too long.
+#
+# 08/13/2015 brad.hultine@charter.com
+#
+###############################################################################
+# Globals
+#
+VERSION="1.00 08/13/2015"
+URLS=(
+      'v1/AUTH_VG/fox_59814/59814_fxphd/59814_fxphd.m3u8?StreamType=live'
+      'v1/AUTH_VG/fox_58574/58574_fxhd/58574_fxhd.m3u8?StreamType=live'
+      'v1/AUTH_VG/fox_70253/70253_fxmhd/70253_fxmhd.m3u8?StreamType=live'
+      'v1/AUTH_VG/fox_17927/17927_fsc/17927_fsc.m3u8?StreamType=live'
+     )
+PORT='8080'      # Port that the Playlist Servers listens to requests on.
+TIMETHRESH='1'   # Threshold for download time of a manifest.
+SIZETHRESH='500' # Minimun bytes that should be downloaded.
+#-----------------------------------------------------------------------------
+#set -x
+
+test() {
+
+    status=''
+    result=$(curl -s "http://localhost:${PORT}/$1" -w "Status:%{http_code},Time:%{time_total},Size:%{size_download}" -o /dev/null)
+    status=$(echo $result | cut -d, -f1 | cut -d: -f2)
+    time=$(echo $result | cut -d, -f2 | cut -d: -f2)
+    size=$(echo $result | cut -d, -f3 | cut -d: -f2)
+
+    if [ "$status" != "200" ]; then
+        echo "Error: Status code ${status} returned for URL: $1.\n"
+    fi
+
+    if (( $(echo "$time > $TIMETHRESH" | bc -l) )); then
+        echo "Error: Download time $time exceeded $TIMETHRESH for URL: $1.\n"
+    fi
+
+    if [ "$size" -lt $SIZETHRESH ]; then
+        echo "Error: Size of download for $1 is $size which is lower than threshold of $SIZETHRESH.\n"
+    fi
+
+}
+
+main() {
+
+    for x in ${URLS[*]}; do
+        status="${status}$(test $x)"
+    done
+
+    if [ ${#status} -gt 1 ]; then
+        echo -e "$status"
+        exit 2
+	else
+        echo "OK: no issues"
+        exit 0
+    fi
+
+}
+
+main $*
+
+exit $?

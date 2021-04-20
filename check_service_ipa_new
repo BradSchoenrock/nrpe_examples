@@ -1,0 +1,29 @@
+#!/bin/bash
+# Usage ./check_service_ipa
+
+ipa_service_status=$(sudo /sbin/ipactl status)
+#declare -a ipa_services=("Directory" "krb5kdc" "kadmin" "ipa_memcached" "httpd" "pki-tomcatd" "ipa-otpd")
+declare -a ipa_services=("Directory" "krb5kdc" "kadmin" "httpd" "ipa-custodia" "ntpd" "ipa-otpd")
+
+for i in "${ipa_services[@]}"
+do
+  service_status=$(echo "$ipa_service_status" | grep "$i" | cut -d':' -f2 | sed -e 's/^[ \t]*//')
+  if [[ "$service_status" == "RUNNING"  ]]; then
+    ok_service_list="$ok_service_list $i"
+  else
+    critical_service_list="$critical_service_list $i"
+  fi
+done
+
+if [[ ! -z "$critical_service_list" ]]; then
+  echo "The services $critical_service_list are not running"
+  exit 2
+fi
+
+if [[ ! -z "$ok_service_list" ]]; then
+  echo "The services $ok_service_list are running"
+  exit 0
+fi
+
+echo "Unable to get the status of ipa services"
+exit 1

@@ -1,0 +1,24 @@
+#!/bin/bash
+# Usage: ./script <expected_return_code> <url> {<optional proxy>}
+if [ $# -lt 2 ]; then
+  echo "ERR: Invalid number of arguments provided to check script"
+  exit 2
+fi
+
+return_code=$1 
+url=$2
+proxy=$3
+
+if [[ ! -z $3 ]]; then
+  return_value=$(curl -sI $url --proxy $3 | grep HTTP)
+else
+  return_value=$(curl -sI $url | grep HTTP)
+fi
+
+if [[ $return_value == *$return_code* ]]; then
+  echo "OK: Call returned $return_value"
+  exit 0
+else
+  echo "CRITICAL: Call returned $return_value"
+  exit 2
+fi

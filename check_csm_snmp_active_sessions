@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Revision 1.0  2018/10/24 
+
+# This plugin gets the count from curl call and generate alarm according to the value set
+
+
+USAGE="$(basename "$0") [-w|--warning]<count> [-c|--critical]<count>"
+THRESHOLD_USAGE="WARNING threshold must be greater than CRITICAL: $(basename "$0") $*"
+
+# print usage
+if [[ $# -lt 4 ]]
+then
+	echo ""
+	echo "Wrong Syntax: $(basename "$0") $*"
+	echo ""
+	echo "Usage: $USAGE"
+	echo ""
+	exit 4
+fi
+# read input
+while [[ $# -gt 0 ]]
+  do
+        case "$1" in
+               -w|--warning)
+               shift
+               warning=$1
+        ;;	
+	       -c|--critical)
+               shift
+               critical=$1
+        ;;
+        esac
+        shift
+  done
+
+if [[ $warning -eq $critical || $critical -gt $warning ]]
+then
+	echo ""
+	echo "$THRESHOLD_USAGE"
+	echo ""
+        echo "Usage: $USAGE"
+	echo ""
+        exit 0
+fi
+
+# curl call 
+HOST=$(uname -n)
+curlResult=$(curl -s http://$HOST:9099/stats?cmd=list | grep -ie skyui -ie spectrum | wc -l)
+
+if [[ "$(echo "$curlResult <=  $critical"|bc)" -eq 1 ]]
+	then
+		echo "CRITICAL - CSM active sessions $curlResult"
+		exit 2
+fi
+if [[ "$(echo "$curlResult <=  $warning"|bc)" -eq 1 ]]
+        then
+                echo "WARNING - CSM active sessions $curlResult"
+                exit 1
+fi
+if [[ "$(echo "$curlResult >  $warning"|bc)" -eq 1 ]]
+        then
+		echo "OK - CSM active sessions $curlResult"
+		exit 0
+fi

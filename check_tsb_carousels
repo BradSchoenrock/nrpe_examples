@@ -1,0 +1,294 @@
+#!/bin/bash
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+STATE_DEPENDENT=4
+
+REVISION="1"
+
+PROGNAME=`basename $0`
+ipg_warn=14
+ppv_warn=2
+
+ipg_crit=13
+ppv_crit=1
+
+print_usage() {
+  echo "Usage:"
+  echo "  $PROGNAME"
+}
+
+print_help() {
+  echo "Checks if files are present on the TSB carousels"
+  print_usage
+  echo "--help|-h"
+  echo "   Print this help screen"
+}
+
+# Information options
+case $1 in
+  --help)
+    print_help
+    exit $STATE_OK
+  ;;
+  -h)
+    print_help
+    exit $STATE_OK
+  ;;
+  --version)
+    print_revision $PROGNAME $REVISION
+    exit $STATE_OK
+  ;;
+  -V)
+    print_revision $PROGNAME $REVISION
+    exit $STATE_OK
+  ;;
+  *)
+    if [ "$1" != "" ];then
+      print_usage
+      exit $STATE_UNKNOWN
+    fi
+esac
+
+task=`wget -q -O - http://localhost:8080/tsbroadcaster |grep  -oE 'currentTaskName = ".*"'|cut -f2 -d '"'`
+if [ "$task" == "null" ];then
+  echo "OK: Server is in standby mode"
+  exit $STATE_OK
+fi
+
+cd /opt/sandt/conf/tsbroadcaster/tasks/$task/
+files=`ls -1|grep data-broadcast-application|xargs grep path | grep -v startup |sed  's/assets-//g'|sed  's/ipg-/ipg_/g'|sed 's/ppv-/ppv_/g'|tr '-' '"'|cut -f4,6 -d'"' --output-delimiter=' '`
+
+critical=""
+warning=""
+
+list=""
+boot_cfg="app oob1"
+for car in `echo $boot_cfg`;do
+  if  ! echo "$files"|grep "$car boot.cfg" 1>/dev/null;then
+    list="$list$car,"
+  fi
+done
+if [ -n "$list" ];then
+  critical="$critical boot.cfg:`echo $list|rev|cut -c 2-|rev`"
+fi
+
+list=""
+am_cfg="app oob1"
+for car in `echo $am_cfg`;do
+  if  ! echo "$files"|grep "$car am.cfg" 1>/dev/null;then
+    list="$list$car,"
+  fi
+done
+if [ -n "$list" ];then
+  critical="$critical am.cfg:`echo $list|rev|cut -c 2-|rev`"
+fi
+
+list=""
+profile_zdb="app oob1 oob1 prefetch"
+for car in `echo $profile_zdb`;do
+  if  ! echo "$files"|grep "$car profile.zdb" 1>/dev/null;then
+    list="$list$car,"
+  fi
+done
+if [ -n "$list" ];then
+  critical="$critical profile.zdb:`echo $list|rev|cut -c 2-|rev`"
+fi
+
+list=""
+z_dts_ini="app oob1"
+for car in `echo $z_dts_ini`;do
+  if  ! echo "$files"|grep "$car z_dts.ini" 1>/dev/null;then
+    list="$list$car,"
+  fi
+done
+if [ -n "$list" ];then
+  critical="$critical z_dts.ini:`echo $list|rev|cut -c 2-|rev`"
+fi
+
+list=""
+ib_services_zdb="ib1 prefetch"
+for car in `echo $ib_services_zdb`;do
+  if  ! echo "$files"|grep "$car ib/services.zdb" 1>/dev/null;then
+    list="$list$car,"
+  fi
+done
+oob_services_zdb="app oob2 oob3"
+for car in `echo $oob_services_zdb`;do
+  if  ! echo "$files"|grep "$car oob/services.zdb" 1>/dev/null;then
+    list="$list$car,"
+  fi
+done
+if [ -n "$list" ];then
+  critical="$critical services.zdb:`echo $list|rev|cut -c 2-|rev`"
+fi
+
+list=""
+ib_packages_zdb="ib1 prefetch"
+for car in `echo $ib_packages_zdb`;do
+  if  ! echo "$files"|grep "$car ib/packages.zdb" 1>/dev/null;then
+    list="$list$car,"
+  fi
+done
+oob_packages_zdb="oob2 oob3"
+for car in `echo $oob_packages_zdb`;do
+  if  ! echo "$files"|grep "$car oob/packages.zdb" 1>/dev/null;then
+    list="$list$car,"
+  fi
+done
+if [ -n "$list" ];then
+  critical="$critical packages.zdb:`echo $list|rev|cut -c 2-|rev`"
+fi
+
+list=""
+ib_ipg_hdr_zdb="ib2"
+for car in `echo $ipg_hdr_zdb`;do
+  if  ! echo "$files"|grep "$car ipg/ib/ipg_hdr.zdb" 1>/dev/null;then
+    list="$list$car,"
+  fi
+done
+
+list=""
+oob_ipg_hdr_zdb="oob4 app prefetch"
+for car in `echo $ipg_hdr_zdb`;do
+  if  ! echo "$files"|grep "$car ipg/oob/ipg_hdr.zdb" 1>/dev/null;then
+    list="$list$car,"
+  fi
+done
+if [ -n "$list" ];then
+  critical="$critical ipg_hdr.zdb:`echo $list|rev|cut -c 2-|rev`"
+fi
+
+
+list=""
+warn_list=""
+ib_ipg="ib2"
+for car in `echo $ib_ipg`;do
+  last_day=`echo "$files"|grep "$car ipg/ib/ipg"| grep -v ipg_hdr | sort |tail -n1|grep -oE '[0-9]{8}'`
+  if [ -z $last_day ];then
+    list="$list assets-$car(N/A),"
+  else
+    days=$(( (`date -d $last_day +%s` - `date -d $(date +%Y%m%d) +%s`)/(60*60*24) + 1 ))
+    if [ $days -lt $ipg_crit ]; then
+      list="$list assets-$car(days: $days),"
+    else
+      if [ $days -lt $ipg_warn ]; then
+        warn_list="$warn_list assets-$car(days: $days),"
+      fi
+    fi
+  fi
+done
+
+oob_ipg="app oob4"
+for car in `echo $oob_ipg`;do
+  last_day=`echo "$files"|grep "$car ipg/oob/ipg"| grep -v ipg_hdr | sort |tail -n1|grep -oE '[0-9]{8}'`
+  if [ -z $last_day ];then
+    if [ "$car" == "oob4" ];then
+      list="$list assets-$car(N/A),"
+      elif [ "$car" == "app" ]; then
+      list="$list$car(N/A),"
+    fi
+  else
+    days=$(( (`date -d $last_day +%s` - `date -d $(date +%Y%m%d) +%s`)/(60*60*24) + 1 ))
+    if [ $days -lt $ipg_crit ]; then
+      if [ "$car" == "oob4" ];then
+        list="$list assets-$car(days: $days),"
+        elif [ "$car" == "app" ]; then
+        list="$list$car(days: $days),"
+      fi
+    else
+      if [ $days -lt $ipg_warn ]; then
+        if [ "$car" == "oob4" ];then
+          warn_list="$warn_list assets-$car(days: $days),"
+          elif [ "$car" == "app" ]; then
+          warn_list="$warn_list$car(days: $days),"
+        fi
+
+      fi
+    fi
+  fi
+done
+if [ -n "$list" ];then
+  critical="$critical IPG:`echo $list|rev|cut -c 2-|rev`"
+fi
+if [ -n "$warn_list" ];then
+  warning="$warning IPG:`echo $warn_list|rev|cut -c 2-|rev`"
+fi
+
+
+
+list=""
+warn_list=""
+ib_ppv="prefetch"
+for car in `echo $ib_ppv`;do
+  last_day=`echo "$files"|grep "$car ppv/ib/ppv"| sort |tail -n1|grep -oE '[0-9]{8}'`
+  if [ -z $last_day ];then
+    list="$list$car(N/A),"
+
+  else
+    days=$(( (`date -d $last_day +%s` - `date -d $(date +%Y%m%d) +%s`)/(60*60*24) + 1 ))
+    if [ $days -lt $ppv_crit ]; then
+      list="$list$car(days:$days),"
+
+    else
+      if [ $days -lt $ppv_warn ]; then
+        warn_list="$warn_list$car(days: $days),"
+      fi
+    fi
+  fi
+done
+
+oob_ppv="app oob4"
+for car in `echo $oob_ppv`;do
+  last_day=`echo "$files"|grep "$car ppv/oob/ppv"| sort |tail -n1|grep -oE '[0-9]{8}'`
+  if [ -z $last_day ];then
+    if [ "$car" == "oob4" ];then
+      list="$list assets-$car(N/A),"
+      elif [ "$car" == "app" ]; then
+      list="$list$car(N/A),"
+    fi
+  else
+    days=$(( (`date -d $last_day +%s` - `date -d $(date +%Y%m%d) +%s`)/(60*60*24) + 1 ))
+    if [ $days -lt $ppv_crit ]; then
+      if [ "$car" == "oob4" ];then
+        list="$list assets-$car(days: $days),"
+        elif [ "$car" == "app" ]; then
+        list="$list$car(days: $days),"
+      fi
+    else
+      if [ $days -lt $ppv_warn ]; then
+        if [ "$car" == "oob4" ];then
+          warn_list="$warn_list assets-$car(days: $days),"
+          elif [ "$car" == "app" ]; then
+          warn_list="$warn_list$car(days: $days),"
+        fi
+      fi
+    fi
+  fi
+done
+if [ -n "$list" ];then
+  critical="$critical PPV:`echo $list|rev|cut -c 2-|rev`"
+fi
+if [ -n "$warn_list" ];then
+  warning="$warning PPV:`echo $warn_list|rev|cut -c 2-|rev`"
+fi
+
+
+
+if [ -z "$critical" ]; then
+  if [ -z "$warning" ];then
+    echo "OK: All files are present"
+    exit $STATE_OK
+  else
+    echo "WARNING: $warning"
+    exit $STATE_WARNING
+  fi
+else
+  echo "CRITICAL: $critical"
+  exit $STATE_CRITICAL
+fi
+
+exit 0
+

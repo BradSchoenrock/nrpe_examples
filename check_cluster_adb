@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# This script runs "sudo crm status" and ensures there are no offline hosts
+# if there are, throw an alarm to prevent a potential splitbrain situation
+
+hostname=$(hostname)
+
+offline_nodes=$(sudo /usr/sbin/crm status | grep OFFLINE)
+if [[ -z $offline_nodes ]]
+then
+	echo "CLUSTER OK: All cluster members online"
+	exit 0
+else
+	echo "CLUSTER CRITICAL: Broken cluster detected. $(hostname) reports the following nodes are offline: $(echo $offline_nodes | cut -d ":" -f 2)"
+	exit 2
+fi

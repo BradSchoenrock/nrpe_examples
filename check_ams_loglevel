@@ -1,0 +1,38 @@
+#!/bin/bash
+# Usage ./check_ams_log_level
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+
+root="root "
+
+root_level=$(grep '<root level=' /etc/tomcat/charter/logback.xml | cut -d'"' -f2)
+
+if [ "$root_level" == "DEBUG" ]; then
+  crit_level_list="$root"
+elif [ "$root_level" == "WARN" ]; then
+  ok_level_list="$root"
+elif [ "$root_level" == "INFO" ]; then
+  ok_level_list="$root"
+fi
+
+if [ -n "$crit_level_list" ]; then
+  echo "Critical: The log level is set to DEBUG for $crit_level_list"
+  exit $STATE_CRITICAL
+fi
+
+#if [ -n "$warn_level_list" ]; then
+#  echo "Warning: The log level is set to INFO for $warn_level_list"
+#  exit $STATE_WARNING
+#fi
+
+if [ -n "$ok_level_list" ]; then
+  #echo "Ok: The log level is set to WARN for $ok_level_list"
+  echo "Ok: The log level is set to INFO or WARN for $ok_level_list"
+  exit $STATE_OK
+fi
+
+echo "Warning: Unable to get the status of log in /etc/tomcat/charter/logback.xml"
+exit $STATE_WARNING
+

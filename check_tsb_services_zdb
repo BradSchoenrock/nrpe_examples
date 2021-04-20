@@ -1,0 +1,59 @@
+#!/bin/bash
+# Author: Chuck Duer
+# Date: 06/05/2018
+# Modified by: 
+# Modified date:
+# Modification: 
+#               
+# This script takes 4 arguments:
+#      $1 = carousel name (normally Legacy_WB_cfg_app for DAC markets and WB_OOB_cfg_app for EC markets)
+#      $2 = services.zdb path/file name to decode (Example: oob/services.zdb)
+#      $3 = file size warning threshold
+#      $4 = file size critical threshold 
+# Returned value will be an unsigned integer.  The returned value is then parsed as follows:
+#      Return WARN if returned value exceeds 55705 (85% of max allowable value of 65535)
+#      Return CRIT if returned value exceeds 58982 (90% of max allowable value of 65535)
+#      Return OKAY if returned value is below the WARN and CRIT levels defined above
+#
+# Examples: 
+#   Command line: ./check_tsb_services_zdb Legacy_WB_cfg_app oob/services.zdb 55705 58982
+#   Output:       OKAY
+#
+#   Command line: ./check_tsb_services_zdb WB_OOB_cfg_app oob/services.zdb 55705 58982
+#   Output:       OKAY
+#
+#   Command line: ./check_tsb_services_zdb WB_OOB_cfg_app oob/services.zdb 55705 58982
+#   Output:       OKAY
+#
+#################################################################################
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+
+carousel=$1
+file=$2
+warn_threshold=$3
+crit_threshold=$4
+re='^[0-9]+$'
+
+if ! grep -q currentTaskName /opt/sandt/conf/tsbroadcaster/platform/common-platform*; then
+  echo "OK - Server on Standby"
+  exit $STATE_OK
+else
+result=$(curl -sLk --connect-timeout 58 --max-time 59 "http://98.9.230.155:80/api/v1/tsb?clli=$(uname -n | awk -F"-" '{print $1}' | cut -c 6- )&host_ip=$(/sbin/ip addr show eth0 | grep 'inet ' | cut -d'/' -f1  | awk '{ print $NF}')&carousel=$carousel&file=$file" | grep "<id type=\"uint" | tail -n1 | cut -d\" -f4)
+if ! [[ $result =~ $re ]] ; then
+        echo "Warning: Unable to fetch the Service ID of services.zdb"
+        exit $STATE_WARNING
+elif [ "${result}" -gt "$crit_threshold" ]; then
+        echo "Critical: Service ID of services.zdb is $result and exceeds $crit_threshold"
+        exit $STATE_CRITICAL
+elif [ "$result" -gt "$warn_threshold" ]; then
+        echo "Warning: Service ID of services.zdb is $result and exceeds $warn_threshold"
+        exit $STATE_WARNING
+else
+        echo "Ok: Service ID of services.zdb is okay $result"
+        exit $STATE_OK
+fi
+fi

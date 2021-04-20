@@ -1,0 +1,15 @@
+#!/bin/sh
+#Script to check up/down status of managed nodes
+#Tim Bailey
+#set -x
+ping_result=$(ping -c 2 $1)
+
+LOSS=`echo $ping_result | grep "100% packet loss" | wc -l`
+
+if [ $LOSS -gt 0 ]; then 
+        echo "$1 is down or not reachable!!!!"
+        exit 2
+else
+        echo "$1 is available"
+        exit 0
+fi     

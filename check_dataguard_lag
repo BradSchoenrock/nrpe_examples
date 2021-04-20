@@ -1,0 +1,38 @@
+#!/bin/bash
+# script to check dataguard presence and lag status
+# Tim Bailey 061515
+#set -x
+
+logfile=/var/log/nds/ora_dg/`ls -lt /var/log/nds/ora_dg | grep -i $1 | head -1 | awk '{print $9}'`
+
+
+        if [ -a $logfile ]
+        then
+        OTHERSRVR=`grep "is not Primary DB" $logfile | awk '{print $3,$4,$5,$6}'`
+        lagstatus1=`grep -i "Transport Lag" $logfile | awk '{print $3}'`
+        lagstatus2=`grep -i "Apply Lag" $logfile | awk '{print $3}'`
+        if [ "$2" = "$OTHERSRVR" ]
+                then
+                echo "OK -$1 is on failover server...check not needed"
+                exit 0
+                else
+
+                if [  $lagstatus1  -ge 1 ] && [ $lagstatus1 -le 3 ] || [ $lagstatus2 -ge 1 ] && [ $lagstatus2 -le 3 ]
+                        then
+                        echo  "Transport Lag or Apply Lag for $1 is at a warning level"
+                        exit 1
+                        elif  [ $lagstatus1 -gt 3 ] || [ $lagstatus2 -gt 3 ]
+                        then
+                        echo  "Transport Lag or Apply Lag for $1 is critical"
+                        exit 2
+                        elif  [ $lagstatus1 -eq 0 ] || [ $lagstatus2 -eq 0 ]
+                        then
+                        echo "OK - lag for $1 is nominal"
+                        exit 0
+                 fi
+        fi
+        else
+        echo "UNKNOWN - $logfile not found"
+        exit 3
+
+        fi

@@ -1,0 +1,57 @@
+#!/bin/bash
+
+USAGE="$(basename "$0") [-w|--warning]<minutes> [-c|--critical]<minutes>"
+
+# print usage
+if [[ $# -lt 4 ]]
+then
+        echo ""
+        echo "Wrong Syntax: $(basename "$0") $*"
+        echo ""
+        echo "Usage: $USAGE"
+        echo ""
+        exit 4
+fi
+# read input
+while [[ $# -gt 0 ]]
+  do
+        case "$1" in
+               -w|--warning)
+               shift
+               warning=$1
+        ;;
+               -c|--critical)
+               shift
+               critical=$1
+        ;;
+        esac
+        shift
+  done
+
+warningMin=$(echo $warning | cut -f1 -d"-")
+warningMax=$(echo $warning | cut -f2 -d"-")
+criticalMin=$(echo $critical | cut -f1 -d"-")
+criticalMax=$(echo $critical | cut -f2 -d"-")
+#topoStitcherCount=$(sudo grep 16668 /etc/opt/csm/topology.xml | egrep -v '<!--[[:space:]]*<server host|transportStreamId' | wc -l)
+topoStitcherCount=$(curl -s "http://127.0.0.1:9099/DownstreamPlugin?cmd=status" |grep 'Healthy' |wc -l)
+activeConnCount=$(netstat -ant | grep 16668 | grep ESTABLISHED | wc -l)
+activePercentage=$(echo "scale=2;$activeConnCount/$topoStitcherCount*100" | bc -l)
+
+if [ "$(echo "$activePercentage <= $criticalMax" | bc)" -eq 1 ] && [ "$(echo "$activePercentage >= $criticalMin" | bc)" -eq 1 ]
+then
+	echo "CRITICAL - CSM to Stitcher connection is $activePercentage%, which is in the threshold range $critical%"
+	exit 2
+fi
+
+if [ "$(echo "$activePercentage <= $warningMax" | bc)" -eq 1 ] && [ "$(echo "$activePercentage >= $warningMin" | bc)" -eq 1 ]
+then
+        echo "WARNING - CSM to Stitcher connection is $activePercentage%, which is in the threshold range $warning%"
+        exit 1
+fi
+
+
+if [[ $activePercentage == 100.00 ]]
+then
+        echo "OK - CSM to Stitcher connection is 100%"
+        exit 0
+fi

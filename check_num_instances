@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Verify if services are passed as argument to the script
+# if not, exit with error
+if [[ -z $1 ]]; then
+  echo "SCRIPT CRITICAL: arg1 required."
+  exit 2
+fi
+
+service=$1
+instances=$(ps -ef | grep -i $1 | grep -v grep | grep -v check_num_instances| grep -v tail | wc -l)
+#Check if more than one service instances are running
+if [[ $instances > 1 ]]; then
+    echo "SERVICE CRITICAL: Number of $1 instances running is $instances, not 1."
+    exit 2
+elif [[ $instances = 1 ]]; then
+    echo "SERVICE OK: Number of $1 instances running is $instances"
+    exit 0
+else
+    echo "SERVICE WARNING: No $1 instances are running"
+    exit 1
+fi

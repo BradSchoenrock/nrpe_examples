@@ -1,0 +1,54 @@
+#!/bin/bash
+################################################################
+# Script to check a service, if service is not running it will try to start the service
+# This script will be used as an NRPE plugin for ICINGA monitoring
+#
+# Revision History:
+# 	Version: 1.0
+# 	Date:    2019-04-01
+################################################################
+
+fn_check_service()
+{
+        result="$(/usr/lib64/nagios/plugins/nrpe/check_service $service)"
+}
+
+service=$1
+OSversion=$(grep '7\.' /etc/redhat-release)
+
+if [[ ! -z $OSversion ]]
+then
+	service_start_cmd="sudo /usr/bin/systemctl start $service"
+else
+	service_start_cmd="sudo /sbin/service $service start"
+fi
+
+sleep_secs=5
+
+fn_check_service
+
+state="$(echo $result|cut -f2 -d" " | tr -d :)"
+
+if [ "$state" = "OK" ] 
+then
+	echo "$result"
+	exit 0
+fi
+if [ "$state" = "CRITICAL" ] 
+then
+    echo "$result"
+	service_start="$($service_start_cmd)"
+	sleep $sleep_secs 
+	fn_check_service
+	state="$(echo $result|cut -f2 -d" " | tr -d :)"
+	if [ "$state" = "OK" ]
+	then
+        echo "$result"
+        exit 0
+	fi
+	if [ "$state" = "CRITICAL" ]
+	then
+		echo "$result"
+        exit 2
+	fi
+fi

@@ -1,0 +1,46 @@
+#!/bin/bash
+
+#checks service as arg1, and optional arg2 as comma separated list of services to ensure print as RUNNING
+##if $2, split $2 on comma and for service in split arg2 validate that `service $1 status | grep $service | grep -i running`
+##else validate `service $1 status | grep -i running`
+##added restart on $1 arg for both $1 and $2 args being down -- tbailey 070815
+
+if [[ -z $1 ]] ; then
+        echo "SCRIPT CRITICAL: arg1 required."
+        exit 2
+fi
+
+errors=0
+failed_services=''
+
+res=$(sudo /usr/sbin/service $1 status)
+
+#if arg2 provided, split arg2 on comma and ensure each service is present and running
+if [[ ! -z $2 ]] ; then
+        IFS=,
+        for service in $2 ; do
+                res=$(sudo /usr/sbin/service $1 status)
+                if [[ $(echo $res | grep $service | grep -i running | grep -i -v not | wc -l) != 1 ]] ; then
+                                errors=$((errors+1))
+                                failed_services+="\"$service\" "
+                fi
+        done
+        if [[ $errors != 0 ]] ; then
+                echo "SERVICE CRITICAL: Encountered $errors errors with the following failed services: $failed_services"
+                exit 2
+        fi
+
+        echo "SERVICE OK: \"$2\" are running"
+        exit 0
+fi
+
+#if arg2 not provided, then just look for RUNNING in the output of service
+res=$(sudo /usr/sbin/service $1 status)
+
+if [[ $(echo $res | grep -i running | grep -i -v not | wc -l) != 1 ]] ; then
+        echo "SERVICE CRITICAL: Service $1 is not running. Received output \"$res\" when checking service status"
+        exit 2
+fi
+
+echo "SERVICE OK: Service $1 is running"
+exit 0

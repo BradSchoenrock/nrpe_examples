@@ -1,0 +1,11 @@
+#!/bin/bash
+STATE_OK=0
+STATE_CRITICAL=2
+response=$(curl -iksL -u kibana-readonly:#cL4h9 https://"$(uname -n)"/app/kibana | head -n1 | cut -d" " -f2)
+        if [ "$response" == "200" ]; then
+                echo "Ok: HTTP response to kibana is 200 OK"
+                exit $STATE_OK
+        elif [ "$response" != "200" ]; then
+                echo "Critical: HTTP response to kibana is not 200 OK"
+                exit $STATE_CRITICAL
+        fi

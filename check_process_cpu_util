@@ -1,0 +1,77 @@
+#!/bin/bash
+
+######################################################################
+# Script to check the CPU Utilization percentage of a given process 
+# Process Name, Warning and Critical Thresholds are passed as the command line arguments
+# Usage   : check_process_cpu_util [-p|--process]<process> [-w|--warning]<percent used> [-c|--critical]<percent used>
+# Example : check_process_cpu_util -p metricbeat -w 80 -c 99 
+# This script will be used as an NRPE plugin for ICINGA monitoring
+#
+# Revision History:
+# 	Version: 1.0
+# 	Date:    2019-07-09
+######################################################################
+
+USAGE="$(basename "$0") [-p|--process]<process> [-w|--warning]<percent used> [-c|--critical]<percent used>"
+THRESHOLD_USAGE="WARNING threshold must be less than CRITICAL: $(basename "$0") $*"
+
+# print usage
+if [[ $# -lt 6 ]]
+then
+	echo ""
+	echo "Wrong Syntax: $(basename "$0") $*"
+	echo ""
+	echo "Usage: $USAGE"
+	echo ""
+	exit 4
+fi
+
+# read input
+while [[ $# -gt 0 ]]
+do
+	case "$1" in
+		-p|--process)
+		shift
+		process=$1
+	;;
+		-w|--warning)
+		shift
+		warning=$1
+	;;
+		-c|--critical)
+		shift
+		critical=$1
+	;;
+		esac
+		shift
+done
+  
+# verify input
+if [[ $warning -eq $critical || $warning -gt $critical ]]
+then
+	echo ""
+	echo "$THRESHOLD_USAGE"
+	echo ""
+	echo "Usage: $USAGE"
+	echo ""
+	exit 4
+fi
+
+# Find the process cpu utilization
+cpuUtilPercentage=$(ps -eo pcpu,comm,user,pid,time |sort -rnk1 | grep "$process" | awk '{print $1}' | head -1)
+
+if [[ "$(echo "$cpuUtilPercentage >=  $critical"|bc)" -eq 1 ]]
+then
+	echo "CRITICAL - CPU Utilzation ($cpuUtilPercentage) of $process is greater than the Critical threshold $critical"
+	exit 2
+fi
+if [[ "$(echo "$cpuUtilPercentage >=  $warning"|bc)" -eq 1 ]]
+then
+       	echo "WARNING - CPU Utilzation ($cpuUtilPercentage) of $process is greater than the Warning threshold $warning"
+       	exit 1
+fi
+if [[ "$(echo "$cpuUtilPercentage <  $warning"|bc)" -eq 1 ]]
+then
+       	echo "OK - CPU Utilzation ($cpuUtilPercentage) of $process is less than the Warning threshold $warning"
+       	exit 0
+fi

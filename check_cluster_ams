@@ -1,0 +1,9 @@
+#!/bin/bash
+
+if [[ $(curl -s --connect-timeout 55 --max-time 56 http://127.0.0.1:5701/hazelcast/rest/cluster | grep "Members \[2\]" | wc -l) != 1 ]]; then
+        echo "CLUSTER CRITICAL: Cluster member count is not 2"
+        exit 2
+fi
+
+echo "CLUSTER OK: 2 members in cluster"
+exit 0

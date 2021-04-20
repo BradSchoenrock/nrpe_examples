@@ -1,0 +1,99 @@
+#!/bin/bash
+
+################################################################
+# Script to check the NTP drift, if above the threshold try an autoheal by bouncing the NTP service.
+# If the bounce doesnt fix it then alert NOC
+# This script will be used as an NRPE plugin for ICINGA monitoring
+#
+# Revision History:
+# 	Version: 1.0
+# 	Date:    2018-09-11
+################################################################
+
+check_ntp_peer()
+{
+        result="$(/usr/lib64/nagios/plugins/nrpe/check_ntp_peer -H 127.0.0.1 -w "$warning" -c "$critical")"
+}
+
+USAGE="$(basename "$0") [-w|--warning]<threshold> [-c|--critical]<threshold>"
+
+OSversion=$(grep '7\.' /etc/redhat-release)
+
+
+if [[ ! -z $OSversion ]]
+then
+	ntpd_stop_cmd="sudo /usr/bin/systemctl stop ntpd"
+	ntpd_start_cmd="sudo /usr/bin/systemctl start ntpd"
+	sleep_secs=2
+else
+	ntpd_stop_cmd="sudo /sbin/service ntpd stop"
+	ntpd_start_cmd="sudo /sbin/service ntpd start"
+	sleep_secs=8
+fi
+
+
+# print usage
+if [[ $# -lt 4 ]]
+then
+	echo ""
+	echo "Wrong Syntax: $(basename "$0") $*"
+	echo ""
+	echo "Usage: $USAGE"
+	echo ""
+	exit 4
+fi
+# read input
+while [[ $# -gt 0 ]]
+  do
+        case "$1" in
+               -w|--warning)
+               shift
+               warning=$1
+        ;;	
+	       -c|--critical)
+               shift
+               critical=$1
+	;;
+        esac
+        shift
+  done
+
+check_ntp_peer
+
+state="$(echo $result|cut -f2 -d" " | tr -d :)"
+
+if [ "$state" = "OK" ] 
+then
+	echo "$result"
+	exit 0
+fi
+if [ "$state" = "WARNING" ] 
+then
+        echo "$result"
+        exit 1
+fi
+if [ "$state" = "CRITICAL" ] 
+then
+        echo "$result"
+ 	stp="$($ntpd_stop_cmd)"	
+	ntp="$(sudo /usr/sbin/ntpd -gq)"
+	stt="$($ntpd_start_cmd)"
+	sleep $sleep_secs 
+	check_ntp_peer
+	state="$(echo $result|cut -f2 -d" " | tr -d :)"
+	if [ "$state" = "OK" ]
+	then
+        	echo "$result"
+        	exit 0
+	fi
+	if [ "$state" = "WARNING" ]
+	then
+        	echo "$result"
+        	exit 1
+	fi
+	if [ "$state" = "CRITICAL" ]
+	then
+		echo "$result"
+        	exit 2
+	fi
+fi

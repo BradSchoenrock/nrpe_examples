@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# This script runs "sudo crm status" and checks that if a service is listed as being owned by a different host
+# it is not running on this server. 
+# if it is, the cluster is broken
+
+hostname=$(hostname)
+
+service_status=$(sudo /usr/sbin/crm status | grep "Resource Group" -A 1000 |  tail -n +2)
+
+#add exceptions to ingore. space delimited is fine.
+service_exceptions="zeromqIP"
+
+while read service; do
+	service_host=$(echo $service | awk '{print $4}')
+	if [[ $service_host != $hostname ]]
+	then
+		service_name=$(echo $service | awk '{print $1}')
+
+		if [[ $service_exceptions == *$service_name* ]]
+		then
+			continue
+		fi
+
+		#a ps ef | grep JanusApp will fail. Handle Janus differently. 
+                if [[ $service_name == 'janusApp' ]]
+                then
+                        service_name='janus'
+                fi
+
+		service_count=$(ps -ef | grep $service_name | wc -l)
+		if [[ $service_count > 1 ]] 
+		then
+			echo "CLUSTER CRITICAL: crm reports service $service_name running on $service_host, but also running on $hostname. Cluster is broken."
+			exit 2
+		fi
+	fi
+done <<< "$service_status"
+
+echo "CLUSTER OK: no services owned by other servers in crm status are running on this server."
+exit 0

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+is_running() {
+
+    status=$(sudo pcs status | grep "ocf::aspera:orchestrator" | grep Started)
+    if [ -n "$status" ]; then 
+        return 0
+    fi
+    return 1
+}
+
+main() {
+
+    if ! is_running; then
+        echo "SERVICE CRITICAL: AsperaOrchestrator not running on cluster."
+        exit 2
+    fi
+    node=$(sudo pcs status | grep "ocf::aspera:orchestrator" | awk '{print $4}')
+    echo "SERVICE OK: AsperaOrchestrator running on node $node."
+    exit 0
+
+}
+
+main $*
+
+exit $?

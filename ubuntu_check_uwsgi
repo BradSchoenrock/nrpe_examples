@@ -1,0 +1,18 @@
+#!/bin/bash
+
+#arg1 as name of uwsgi app to check
+
+if [[ -z $1 ]] ; then
+        echo "SCRIPT CRITICAL: arg1 required."
+        exit 2
+fi
+
+res=$(sudo /usr/sbin/service uwsgi status $1)
+
+if [[ $(echo $res | grep -i running | grep -i -v not | wc -l) != 1 ]] ; then
+        echo "SERVICE CRITICAL: Service $1 is not running. Received output \"$res\" when checking service status"
+        exit 2
+fi
+
+echo "SERVICE OK: Service $1 is running"
+exit 0

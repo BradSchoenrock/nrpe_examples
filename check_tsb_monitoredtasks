@@ -1,0 +1,40 @@
+#!/bin/bash
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+flag=0
+
+hostname=$(hostname)
+
+listVar="aabfl   albny   alcotn  allnmi  ashenc  augme   austx   bakca   baysmi  bhmal   birmal  bknny   bngny   bufny   canoh   clboh   cleoh   cscsc   daltx   delfl   denttx  detmi   ftwrtx  grdca   gsaasc  gsonc   gwinga  hvnny   hwdca   indin   ineca   jacktn  kearne  kennwa  kscmo   leedal  lncne   medfor  mkewi   mpkhca  mpksca  newnga  newtct  nmnny   ocfca   porme   qunny   ralnc   rchny   reddca  renonv  rochmn  rtxtx   saxtx   sdgca   sfvca   sldcmo  sldlla  slotca  smnny   spngtx  stckga  stclmn  stiny   syrny   tbdxla  tpbfl   tpffl   trictn  wilnc   worcma"
+
+for i in $listVar; do
+        if [[ "$hostname" = *"$i"* ]]
+        then
+                flag=1
+                break
+        fi
+done
+
+if [ $flag -eq 1 ]
+then
+	votoolsip="98.9.230.155"
+else
+	votoolsip="98.8.170.155"
+fi
+
+monitoredtasks=( $(curl -ks --connect-timeout 58 --max-time 59 https://$votoolsip/api/v1/tsb/clli/$(uname -n | awk -F"-" '{print $1}' | cut -c 6- ) | sed -n -e 12p -e 24p | sed -e 's/^[ \t]*// ; s/"//g') )
+
+if [ ${#monitoredtasks[@]} -eq 0 ]; then
+	echo "Unknown response"
+	exit $STATE_WARNING
+fi
+
+if [ "${monitoredtasks[0]}" = "${monitoredtasks[1]}" ]; then
+	echo "Service OK: monitoredtasks match - Primary:${monitoredtasks[0]} Standby:${monitoredtasks[1]}"
+	exit $STATE_OK
+else
+        echo "Service Critical: monitoredtasks not matching - Primary:${monitoredtasks[0]} Standby:${monitoredtasks[1]}"
+        exit $STATE_CRITICAL
+fi

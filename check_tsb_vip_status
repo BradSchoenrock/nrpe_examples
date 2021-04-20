@@ -1,0 +1,22 @@
+#!/bin/bash
+#Usage ./script
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+tsb_status=( $(curl -sLk --connect-timeout 58 --max-time 59 http://98.9.230.155:80/api/v1/tsb/clli/$(uname -n | awk -F- {'print $1'} | cut -c 6- ) | awk -F'"' '$2=="state"{print $4}'| tail -n1) )
+if [ -z "$tsb_status" ]; then
+        echo "Warning: status Unknown"
+        exit $STATE_WARNING
+fi
+
+if [ "$tsb_status" == "Running" ]; then
+        echo "OK: VIP is pointing to Running server"
+        exit $STATE_OK
+elif [ "$tsb_status" == "Standby" ]; then
+        echo "Critical: VIP is pointing to Standby server"
+        exit $STATE_CRITICAL
+else
+        echo "Warning: Status Unknown"
+        exit $STATE_WARNING
+fi

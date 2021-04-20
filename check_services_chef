@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [[ -z $1 ]] ; then
+        echo "SCRIPT CRITICAL: arg1 as ctrl script required"
+        exit 2
+fi
+
+res=$(sudo $1 status)
+
+downed_services=""
+while read service_status; do
+	if [[ "$service_status" == *"down"* ]]; then
+		service_name=$(echo "$service_status" | awk '{print $2}' | tr -d ":")
+		downed_services="$service_name $downed_services"
+	fi
+done <<< "$res"
+
+if [ -n "$downed_services" ]; then
+        echo "SERVICE CRITICAL: $1 reports the following downed services:" $downed_services
+        exit 2
+fi
+
+echo "SERVICE OK: $1 reports 0 downed services"
+exit 0

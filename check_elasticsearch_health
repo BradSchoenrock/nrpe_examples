@@ -1,0 +1,20 @@
+#!/bin/bash
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+
+result=$(curl -s -XGET 'http://127.0.0.1:9200/_cat/health?pretty=true' | cut -d" " -f4)
+if [[ $result == "green" ]] ; then
+  echo "OK: Elastic cluster status is $result"
+  exit $STATE_OK
+elif [[ $result == "yellow" ]] ; then
+  echo "Warning: Elastic cluster status is $result"
+  exit $STATE_WARNING
+elif [[ $result == "red" ]] ; then
+  echo "Critical: Elastic cluster status is $result"
+  exit $STATE_CRITICAL
+else
+  echo "Unknown: Elastic cluster status is $result"
+  exit $STATE_UNKNOWN
+fi

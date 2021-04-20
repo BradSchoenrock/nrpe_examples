@@ -1,0 +1,44 @@
+#!/bin/bash
+#exit codes
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+
+#arguments required
+##########################################################################################
+#######	carousel =	Legacy_WB_cfg_app    	##########################################
+#######	file_name = z_dts.ini			##########################################
+#######	dts_maxsize = 10000 bytes(10 kb)	##########################################
+####### ./check_tsb_z_dts_fs.sh carousel file_name dts_maxsize ###########################
+##########################################################################################
+
+carousel=$1
+file_name=$2
+dts_maxsize=$3
+
+if [ "$#" -ne 3 ]; then
+  echo "Invalid number of Arguments"
+  exit $STATE_WARNING
+elif ! grep -q currentTaskName /opt/sandt/conf/tsbroadcaster/platform/common-platform*; then
+  echo "OK - Server on Standby"
+  exit $STATE_OK	
+else
+	response=$(curl -iL --connect-timeout 28 --max-time 29 "98.9.230.155/api/v1/tsb?clli=$(uname -n | cut -c6-11)&host_ip=$(/sbin/ip addr show eth0 | grep 'inet ' | cut -d'/' -f1  | awk '{ print $NF}')&carousel=$1&file=$2" 2>/dev/null | grep HTTP | awk -F" " '{print $2}')	
+	if [ "$response" != "200" ]; then
+		echo "WARNING: Unable to fetch z_dts.ini"
+		exit $STATE_WARNING		
+	else
+		file_size=$(curl -sL --connect-timeout 28 --max-time 29 "98.9.230.155/api/v1/tsb?clli=$(uname -n | cut -c6-11)&host_ip=$(/sbin/ip addr show eth0 | grep 'inet ' | cut -d'/' -f1  | awk '{ print $NF}')&carousel=Legacy_WB_cfg_app&file=z_dts.ini" | wc -c)
+		if [ "$file_size" -gt "$dts_maxsize" ]; then
+			echo "CRITICAL: File size ($file_size bytes) exceeded the max size"
+			exit $STATE_CRITICAL
+		elif [ "$file_size" -lt "$dts_maxsize" ]; then
+			echo "OK: File size is okay,  $file_size bytes"
+			exit $STATE_OK
+		else
+			echo "Unable to get the File size"
+ 			exit $STATE_WARNING
+		fi
+	fi
+fi

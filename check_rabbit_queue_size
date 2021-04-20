@@ -1,0 +1,12 @@
+#!/bin/bash
+QUEUE_SIZE=$(sudo /usr/sbin/rabbitmqctl list_queues | grep -E 'lttnco|pvdcco' | awk '{print $2}' | head -n1)
+if [[ $QUEUE_SIZE -gt $2 ]]; then
+        echo "Critical rabbitmq queue size is more than $2"
+        exit 2
+elif [[ $QUEUE_SIZE -gt $1 ]]; then
+        echo "Warning rabbitmq queue size is more than $1"
+        exit 1
+else
+        echo "Ok: Rabbitmq queue is less then $1"
+        exit 0
+fi

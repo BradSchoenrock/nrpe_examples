@@ -1,0 +1,115 @@
+#!/bin/bash
+
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+STATE_DEPENDENT=4
+
+PROGNAME=`basename $0`
+
+print_usage() {
+  echo "Usage:"
+  echo "  $PROGNAME --tns"
+  echo "  $PROGNAME --db"
+  echo "  $PROGNAME --login"
+}
+
+print_help() {
+  print_revision $PROGNAME
+  echo ""
+  print_usage
+  echo ""
+  echo "Check Oracle status"
+  echo ""
+  echo "--tns "
+  echo "   Check local TNS server"
+  echo "--db SID"
+  echo "   Check local database (search /bin/ps for PMON process) and check"
+  echo "--login SID"
+  echo "   Attempt a dummy login and alert if not ORA-01017: invalid username/password"
+  echo "--help"
+  echo "   Print this help screen"
+}
+
+# Information options
+case $1 in
+--help)
+                print_help
+    exit $STATE_OK
+    ;;
+-h)
+                print_help
+    exit $STATE_OK
+    ;;
+--version)
+                print_revision $PROGNAME $REVISION
+    exit $STATE_OK
+    ;;
+-V)
+                print_revision $PROGNAME $REVISION
+    exit $STATE_OK
+    ;;
+esac
+
+list=""
+sids=""
+for row in `egrep -v '^#|^$' /etc/oratab` ; do
+        ORACLE_HOME=`echo $row|cut -d : -f 2`
+        ORACLE_SID=`echo $row|cut -d : -f 1`
+        sids="$sids $ORACLE_SID"
+        PATH=$PATH:$ORACLE_HOME/bin
+        LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ORACLE_HOME/lib
+        export ORACLE_HOME PATH LD_LIBRARY_PATH
+        case $1 in
+        --tns)
+            tnsping $ORACLE_SID 1>/dev/null
+            if [ $? -eq 1 ] ; then
+                list="$list $ORACLE_SID"
+            fi
+            ;;
+        --db)
+            if [ `ps -ef | grep -v grep | grep -c ora_pmon_$ORACLE_SID` -eq "0" ] ; then
+                list="$list $ORACLE_SID"
+            fi
+            ;;
+        --login)
+            if [ `echo "exit" | sqlplus -L dummy/pass@$ORACLE_SID|grep ORA-01017| wc -l` -eq "0" ] ; then
+                list="$list $ORACLE_SID"
+            fi
+            ;;
+        *)
+            print_usage
+            exit $STATE_UNKNOWN
+        esac
+done
+
+case $1 in
+--tns)
+        if [ "$list" == "" ]; then
+                echo "OK: TNS ok for$sids"
+                exit $STATE_OK
+        else
+                echo "No TNS Listener on: $list"
+                exit $STATE_CRITICAL
+        fi
+        ;;
+--db)
+        if [ "$list" == "" ]; then
+                echo "OK: DB up for$sids"
+                exit $STATE_OK
+        else
+                echo "Database is DOWN: $list"
+                exit $STATE_CRITICAL
+        fi
+        ;;
+--login)
+        if [ "$list" == "" ]; then
+                echo "OK: Login successful for$sids"
+                exit $STATE_OK
+        else
+                echo "Can not login to: $list"
+                exit $STATE_CRITICAL
+        fi
+        ;;
+esac

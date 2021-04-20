@@ -1,0 +1,37 @@
+#!/bin/bash
+
+#Grep for the given string on a ps aux, looking for 1 matching line for argument. 
+#if arg 2 provided, match n = $2 lines for argument
+
+reg=$1
+if [[ -z $1 ]] ; then
+	echo "SCRIPT CRITICAL: required string for process match not supplied"
+	exit 2
+fi
+
+res=`ps aux | grep "$reg" | grep -v grep | grep -v bash | grep -v watchdog | grep -v check_service_ps | grep -vi "tail -f" | wc -l`
+
+#if arg 2 provided, this is the linecount to match against.
+if [[ ! -z $2 ]] ; then
+
+	if [[ $res -ne $2 ]] ; then
+		    echo "SERVICE CRITICAL: Process count for $1 does not match $2. Got count $res"
+		    exit 2
+	fi
+
+	echo "SERVICE OK: Got process count $res for \"$1\""
+	exit 0
+
+fi
+
+#if arg 2 not provided, match for a single line
+if [[ $res != 1 ]] ; then
+	echo "SERVICE CRITICAL: Process count for $1 does not match 1. Got count $res"
+	exit 2
+fi
+
+echo "SERVICE OK: Got process count $res for \"$1\""
+exit 0
+
+
+

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+echo "" >/dev/tcp/$1
+
+if [[ $? = 0 ]] ; then
+        echo "OK: Connection to $1 succeeded"
+        exit 0
+else
+        echo "CRITICAL: Connection to $1 failed"
+        exit 2
+fi

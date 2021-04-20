@@ -1,0 +1,25 @@
+#!/bin/bash
+if [[ $# != 1 ]]
+then
+	echo "SCRIPT CRITICAL: invalid number of arguments"
+	exit 2
+fi
+
+iface=$1
+res=$(ethtool $iface)
+ret=$?
+
+if [[ $ret != 0 ]]
+then
+	echo "CHECK CRITICAL: ethtool returned non-zero exit code $ret"
+	exit 2
+fi
+
+if [[ -z $(echo $res | grep "Link detected: yes") ]]
+then
+	echo "LINK CRITICAL: ethtool reports link not detected"
+	exit 2
+fi
+
+echo "LINK OK: ethtool reports link detected"
+exit 0

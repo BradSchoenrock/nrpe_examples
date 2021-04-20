@@ -1,0 +1,16 @@
+#!/bin/bash
+if [[ $# < 2 ]] ; then
+	echo "SCRIPT CRITICAL: arg1 as host to ping and arg2 as timeout required"
+	exit 2
+fi
+
+ping -c 1 $1 -W $2 &> /dev/null
+res=$?
+
+if [[ $res == 0 ]] ; then
+	echo "PING OK for host $1 with timeout $2"
+	exit 0
+else
+	echo "PING CRITICAL: ping exited with error code $res for host $1 with timeout $2"
+	exit 2
+fi

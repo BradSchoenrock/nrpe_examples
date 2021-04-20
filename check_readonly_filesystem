@@ -1,0 +1,15 @@
+#!/bin/bash
+paths="/ /opt /home /boot /tmp /var /var/audit /var/log"
+# ensure (close enough) filname will be unique so no conflict when simultaneous checks 
+filename_seed=$(date +%s%N)
+for path in $paths; do
+        test_file="${path}/test_readonly_$filename_seed"
+        res=$(touch $test_file && rm $test_file)
+        if [[ $? != 0 ]];
+        then
+                echo "ERR: readonly filesystem detected. Unable to create file at $test_file without output $res"
+                exit 2
+        fi
+done;
+echo "Filesystem OK"
+exit 0

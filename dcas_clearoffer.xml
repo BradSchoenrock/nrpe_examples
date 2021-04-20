@@ -1,0 +1,19 @@
+<BasicImport xmlns = "URN:NNDS:UHE:MD:GW:ADP:0001" xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation = "URN:NNDS:UHE:MD:GW:ADP:0001 uheImportMain.xsd" utcOffset = "+00:00" frameRate = "25">
+    <businessOfferImport>
+        <NativeOfferRqsts>
+            <NativeOfferRqst action = "clear">
+                <offerKey>Bogus</offerKey>
+                <offerStartDateTime>1970/01/01 00:00:00:00</offerStartDateTime>
+                <offerEndDateTime>1970/01/01 00:00:00:00</offerEndDateTime>
+                <businessRuleType>NDS_CA</businessRuleType>
+            </NativeOfferRqst>
+        </NativeOfferRqsts>
+        <NativeOfferServiceBindings>
+            <NativeOfferServiceBinding action = "clear">
+                <offerKey>Bogus</offerKey>
+                <siServiceKey>50121</siServiceKey>
+                <assocStartDateTime>1970/01/01 00:00:00:00</assocStartDateTime>
+            </NativeOfferServiceBinding>
+        </NativeOfferServiceBindings>
+    </businessOfferImport>
+</BasicImport>

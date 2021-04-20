@@ -1,0 +1,15 @@
+#!/bin/bash
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+
+type=$1
+critical_count=$2
+count=$(sudo rabbitmqctl list_connections | grep -c "charter_$type")
+if [[ $count -lt $critical_count ]]; then
+        echo "CRITICAL: $type count is less than $critical_count"
+        exit $STATE_CRITICAL
+else
+        echo "OK: $type count is ok"
+        exit $STATE_OK
+fi

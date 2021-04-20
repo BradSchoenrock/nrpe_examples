@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# This script runs "sudo crm status" and check that for provided arg1 as service name
+# the service name has output like: <service_name>   (ocf::heartbeat:IPaddr2):       Started <host>
+# this check only verifies that <service_name> is "Started"
+# if there is no entry for <service_name> associated with "Started", critical is returned
+
+check_service=$1
+
+service_status=$(sudo /usr/sbin/crm status | grep "Resource Group" -A 1000 | grep $check_service)
+
+if [[ $service_status == *"Started"* ]]
+then
+	echo "SERVICE OK: $check_service running on" $(echo "$service_status" | awk '{print $4}' )
+	exit 0
+else
+	echo "SERVICE CRITICAL: $check_service is not running. Output matching service name: " $service_status
+	exit 2
+fi

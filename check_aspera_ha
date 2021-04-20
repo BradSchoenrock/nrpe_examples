@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# File: check_aspera_ha
+#
+# Description: This is a test script that will test the status of Linux HA
+#              on the Aspera/Orchestator 1+1 cluster.  The script will return 
+#              warning if there a crm_log file in the temp directory.  The 
+#              presense of a crm_log file indicates an HA event.  If the log
+#              file has any errors in it, then it will return critical status. 
+#
+# Return Status: 0=OK, 1 WARN, 2=CRIT, 3=UNKNOWN
+#
+# 03/03/2016 brad.hultine@charter.com
+#
+###############################################################################
+# Globals
+#
+VERSION="1.00 03/03/2016"
+CRMTMPLOG="/tmp/crm_mon.txt"
+#-----------------------------------------------------------------------------
+#set -x
+
+check_log() {
+
+    error=$(cat $CRMTMPLOG | awk '{print $5}' | grep -v OK)
+    warn=$(cat $CRMTMPLOG) 
+   
+    if [ -n "$error" ]; then
+        rm $CRMTMPLOG
+        echo "CRITICAL ERRORS: $warn"
+        exit 2
+    else 
+        rm $CRMTMPLOG
+        echo "WARN - The following HA events have happened since last poll: $warn" 
+        exit 1
+    fi
+        
+}
+
+main() {
+
+    # Check if the log exists.  If not, then everything is ok.
+    if [ -f "$CRMTMPLOG" ]; then
+        check_log
+    else
+        echo "OK: no issues"
+        exit 0
+    fi
+
+}
+
+main $*
+
+exit $?
